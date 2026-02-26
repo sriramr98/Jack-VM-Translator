@@ -1,10 +1,21 @@
-use std::{env::args, ffi::OsStr, fs, path::Path, process::exit};
+use std::{
+    env::args,
+    ffi::OsStr,
+    fs::{self, File},
+    io::BufWriter,
+    path::Path,
+    process::exit,
+};
 
 use anyhow::{Result, anyhow};
 
-use crate::lexer::Lexer;
+use crate::{
+    converter::{Converter, HackConverter},
+    lexer::Lexer,
+};
 
 mod command;
+mod converter;
 mod lexer;
 
 fn main() {
@@ -51,7 +62,12 @@ fn main() {
 }
 
 fn translate(input_path: &Path, output_path: &Path) -> Result<()> {
+    use std::io::Write;
+
     let lexer = Lexer::new(input_path)?;
+    let output_file = File::create(output_path)?;
+    let mut writer = BufWriter::new(output_file);
+    let mut converter = HackConverter::new();
 
     for result in lexer {
         let lexed_res = result?;
@@ -63,7 +79,10 @@ fn translate(input_path: &Path, output_path: &Path) -> Result<()> {
             .command
             .ok_or_else(|| anyhow!("Command not found"))?;
 
-        println!("Command: {}", command)
+        let converted = converter.convert(command)?;
+        writeln!(writer, "{}", converted)?
     }
+
+    writer.flush()?;
     Ok(())
 }
