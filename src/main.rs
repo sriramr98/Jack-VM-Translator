@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
+use std::io::Write;
 
 use crate::{
     converter::{Converter, HackConverter},
@@ -45,13 +46,8 @@ fn main() {
     }
 
     let input_file_path = Path::new(input_file_path.as_str());
-    let output_file_name = input_file_path
-        .file_name()
-        .unwrap_or(OsStr::new("output.vm"));
 
-    let output_file_path = Path::new(output_file_name);
-
-    match translate(input_file_path, output_file_path) {
+    match translate(input_file_path) {
         Ok(_) => {
             println!("Translation completed...")
         }
@@ -61,13 +57,20 @@ fn main() {
     }
 }
 
-fn translate(input_path: &Path, output_path: &Path) -> Result<()> {
-    use std::io::Write;
+fn translate(input_path: &Path) -> Result<()> {
+    let input_file_stem = input_path.file_stem().unwrap_or(OsStr::new("output"));
+    let output_file_name = Path::new(input_file_stem).with_extension("asm");
+    let input_file_name = input_file_stem
+        .to_os_string()
+        .into_string()
+        .map_err(|e| anyhow!("Failed to convert OsString to String: {:?}", e))?;
+
+    let output_path = output_file_name.as_path();
 
     let lexer = Lexer::new(input_path)?;
     let output_file = File::create(output_path)?;
     let mut writer = BufWriter::new(output_file);
-    let mut converter = HackConverter::new();
+    let mut converter = HackConverter::new(input_file_name);
 
     for result in lexer {
         let lexed_res = result?;
@@ -78,7 +81,6 @@ fn translate(input_path: &Path, output_path: &Path) -> Result<()> {
         let command = lexed_res
             .command
             .ok_or_else(|| anyhow!("Command not found"))?;
-
         let converted = converter.convert(command)?;
         writeln!(writer, "{}", converted)?
     }

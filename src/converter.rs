@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::format, str::FromStr};
+use std::collections::HashMap;
 
 use anyhow::{Ok, Result, anyhow};
 
@@ -10,25 +10,25 @@ pub trait Converter {
 
 pub struct HackConverter {
     type_count: HashMap<Command, u64>,
+    file_name: String,
 }
 
 fn get_segment_label(segment: &Segment) -> String {
     match segment {
         Segment::Argument => "ARG".to_string(),
         Segment::Local => "LCL".to_string(),
-        Segment::Static => todo!(),
-        Segment::Constant => todo!(),
         Segment::This => "THIS".to_string(),
         Segment::That => "THAT".to_string(),
         Segment::Pointer => String::new(),
-        Segment::Temp => String::new(),
+        _ => String::new(),
     }
 }
 
 impl HackConverter {
-    pub fn new() -> Self {
+    pub fn new(file_name: String) -> Self {
         Self {
             type_count: HashMap::new(),
+            file_name,
         }
     }
 
@@ -36,6 +36,20 @@ impl HackConverter {
         match segment {
             Segment::Constant => Ok(convert_push_constant(idx)),
             Segment::Temp => Ok(convert_push_temp(idx)),
+            Segment::Static => Ok(convert_push_static(&self.file_name, idx)),
+            Segment::Pointer => {
+                let label = match idx {
+                    0 => get_segment_label(&Segment::This),
+                    1 => get_segment_label(&Segment::That),
+                    _ => {
+                        return Err(anyhow!(
+                            "Invalid index for push pointer. Expected ( 0 , 1 ) but got {}",
+                            idx
+                        ));
+                    }
+                };
+                Ok(convert_push_pointer(label, format!("push pointer {}", idx)))
+            }
             _ => {
                 let label = get_segment_label(&segment);
 
@@ -64,6 +78,20 @@ impl HackConverter {
         match segment {
             Segment::Constant => Err(anyhow!("Cannot pop constant")),
             Segment::Temp => Ok(convert_pop_temp(idx)),
+            Segment::Static => Ok(convert_pop_static(&self.file_name, idx)),
+            Segment::Pointer => {
+                let label = match idx {
+                    0 => get_segment_label(&Segment::This),
+                    1 => get_segment_label(&Segment::That),
+                    _ => {
+                        return Err(anyhow!(
+                            "Invalid index for pop pointer. Expected ( 0 , 1 ) but got {}",
+                            idx
+                        ));
+                    }
+                };
+                Ok(convert_pop_pointer(label, format!("pop pointer {}", idx)))
+            }
             _ => {
                 let command = Command::Pop {
                     segment,
@@ -362,6 +390,56 @@ fn convert_push_temp(idx: u16) -> String {
     )
 }
 
+fn convert_push_static(name: &String, idx: u16) -> String {
+    format!(
+        "
+        // push static {arg}\n\
+        @{name}.{arg}\n\
+        D=M\n\
+        @SP\n\
+        A=M\n\
+        M=D\n\
+        @SP\n\
+        M=M+1
+        ",
+        name = name,
+        arg = idx
+    )
+}
+
+fn convert_push_pointer(segment_label: String, comment: String) -> String {
+    format!(
+        "
+        //{comment}\n\
+        @{label}\n\
+        D=M\n\
+        @SP\n\
+        A=M\n\
+        M=D\n\
+        @SP\n\
+        M=M+1\n\
+    ",
+        comment = comment,
+        label = segment_label
+    )
+}
+
+fn convert_pop_pointer(segment_label: String, comment: String) -> String {
+    format!(
+        "
+        //{comment}\n\
+        @SP\n\
+        M=M-1\n\
+        A=M\n\
+        D=M\n\
+        @{label}\n\
+        M=D\n\
+        ",
+        comment = comment,
+        label = segment_label
+    )
+}
+
 fn convert_pop_temp(idx: u16) -> String {
     format!(
         "// pop temp {idx}\n\
@@ -383,5 +461,21 @@ fn convert_pop_temp(idx: u16) -> String {
             A=M\n\
             M=D\n\
         ",
+    )
+}
+
+fn convert_pop_static(name: &String, idx: u16) -> String {
+    format!(
+        "
+        // pop static {idx}\n\
+        @SP\n\
+        M=M-1\n\
+        A=M\n\
+        D=M\n\
+        @{name}.{arg}\n\
+        M=D\n\
+    ",
+        name = name,
+        arg = idx
     )
 }
