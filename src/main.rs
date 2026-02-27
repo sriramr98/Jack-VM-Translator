@@ -59,13 +59,13 @@ fn main() {
 
 fn translate(input_path: &Path) -> Result<()> {
     let input_file_stem = input_path.file_stem().unwrap_or(OsStr::new("output"));
-    let output_file_name = Path::new(input_file_stem).with_extension("asm");
     let input_file_name = input_file_stem
         .to_os_string()
         .into_string()
         .map_err(|e| anyhow!("Failed to convert OsString to String: {:?}", e))?;
 
-    let output_path = output_file_name.as_path();
+    let input_dir = input_path.parent().unwrap_or(Path::new("."));
+    let output_path = input_dir.join(Path::new(input_file_stem).with_extension("asm"));
 
     let lexer = Lexer::new(input_path)?;
     let output_file = File::create(output_path)?;
