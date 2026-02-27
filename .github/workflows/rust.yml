@@ -16,12 +16,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install musl target
+      run: rustup target add x86_64-unknown-linux-musl
     - name: Build
-      run: cargo build --release --verbose
+      run: cargo build --release --target x86_64-unknown-linux-musl --verbose
     - name: Run tests
       run: cargo test --verbose
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: vm-translator-linux
-        path: target/release/vm_translator
+        path: target/x86_64-unknown-linux-musl/release/vm_translator
