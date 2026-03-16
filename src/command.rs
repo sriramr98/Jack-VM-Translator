@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use anyhow::Ok;
 use strum::{Display, EnumString};
 
 #[derive(Debug, Clone, Copy, EnumString, PartialEq, Eq, Display, Hash)]
@@ -28,6 +29,8 @@ pub enum Command {
     And,
     Or,
     Not,
+    Label { label: String },
+    IfGoto { label: String },
 }
 
 impl Command {
@@ -73,6 +76,22 @@ impl Command {
             "and" => Ok(Command::And),
             "or" => Ok(Command::Or),
             "not" => Ok(Command::Not),
+            "label" => {
+                let label = parts
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("label name missing for directive `label`"))?;
+                Ok(Command::Label {
+                    label: label.to_string(),
+                })
+            }
+            "if-goto" => {
+                let label = parts
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("label name missing for directive `label`"))?;
+                Ok(Command::IfGoto {
+                    label: label.to_string(),
+                })
+            }
             _ => Err(anyhow::anyhow!("Unknown command: {}", command_str)),
         }
     }

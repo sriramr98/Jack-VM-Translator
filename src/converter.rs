@@ -1,16 +1,17 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::{Ok, Result, anyhow};
 
 use crate::command::{Command, Segment};
 
 pub trait Converter {
-    fn convert(self: &mut Self, command: Command) -> Result<String>;
+    fn convert(&mut self, command: Command) -> Result<String>;
 }
 
 pub struct HackConverter {
     type_count: HashMap<Command, u64>,
     file_name: String,
+    labels: HashSet<String>,
 }
 
 fn get_segment_label(segment: &Segment) -> String {
@@ -29,10 +30,11 @@ impl HackConverter {
         Self {
             type_count: HashMap::new(),
             file_name,
+            labels: HashSet::new(),
         }
     }
 
-    fn convert_push(self: &Self, segment: Segment, idx: u16) -> Result<String> {
+    fn convert_push(&self, segment: Segment, idx: u16) -> Result<String> {
         match segment {
             Segment::Constant => Ok(convert_push_constant(idx)),
             Segment::Temp => Ok(convert_push_temp(idx)),
@@ -53,7 +55,7 @@ impl HackConverter {
             _ => {
                 let label = get_segment_label(&segment);
 
-                return Ok(format!(
+                Ok(format!(
                     "//push {segment} {idx}\n\
                     @{label}\n\
                     D=M\n\
@@ -67,14 +69,14 @@ impl HackConverter {
                     @SP\n\
                     M=M+1\n\
                     ",
-                    segment = segment.to_string(),
+                    segment = segment,
                     idx = idx
-                ));
+                ))
             }
         }
     }
 
-    fn convert_pop(self: &mut Self, segment: Segment, idx: u16) -> Result<String> {
+    fn convert_pop(&mut self, segment: Segment, idx: u16) -> Result<String> {
         match segment {
             Segment::Constant => Err(anyhow!("Cannot pop constant")),
             Segment::Temp => Ok(convert_pop_temp(idx)),
@@ -123,7 +125,7 @@ impl HackConverter {
                     count = type_count,
                     label = label,
                     idx = idx,
-                    segment = segment.to_string()
+                    segment = segment
                 );
 
                 self.type_count.insert(command, type_count + 1);
@@ -132,7 +134,7 @@ impl HackConverter {
         }
     }
 
-    fn convert_add(self: &Self) -> Result<String> {
+    fn convert_add(&self) -> Result<String> {
         Ok("//add\n\
         @SP\n\
         M=M-1\n\
@@ -147,7 +149,7 @@ impl HackConverter {
             .to_string())
     }
 
-    fn convert_sub(self: &Self) -> Result<String> {
+    fn convert_sub(&self) -> Result<String> {
         Ok("//sub\n\
         @SP\n\
         M=M-1\n\
@@ -162,7 +164,7 @@ impl HackConverter {
             .to_string())
     }
 
-    fn convert_neg(self: &Self) -> Result<String> {
+    fn convert_neg(&self) -> Result<String> {
         Ok("//neg\n\
     	@SP\n\
     	M=M-1\n\
@@ -173,7 +175,7 @@ impl HackConverter {
             .to_string())
     }
 
-    fn convert_and(self: &Self) -> Result<String> {
+    fn convert_and(&self) -> Result<String> {
         Ok("//and\n\
        @SP\n\
        M=M-1\n\
@@ -188,7 +190,7 @@ impl HackConverter {
             .to_string())
     }
 
-    fn convert_or(self: &Self) -> Result<String> {
+    fn convert_or(&self) -> Result<String> {
         Ok("//or\n\
        @SP\n\
        M=M-1\n\
@@ -203,7 +205,7 @@ impl HackConverter {
             .to_string())
     }
 
-    fn convert_not(self: &Self) -> Result<String> {
+    fn convert_not(&self) -> Result<String> {
         Ok("//not\n\
            	@SP\n\
            	M=M-1\n\
@@ -338,10 +340,37 @@ impl HackConverter {
         self.type_count.insert(Command::Lt, current_count + 1);
         Ok(result)
     }
+
+    fn convert_label(&mut self, label: String) -> Result<String> {
+        self.labels.insert(label.clone());
+        let res = format!("@{label}", label = label);
+        Ok(res)
+    }
+
+    fn convert_if_goto(&mut self, label: String) -> Result<String> {
+        if !self.labels.contains(&label) {
+            return Err(anyhow!("Label not created to JUMP"));
+        }
+
+        let res = format!(
+            "
+                // IF-GOTO {label}\n\
+                @SP\n\
+                M=M-1\n\
+                A=M\n\
+                D=M\n\
+                @{label}\n\
+                D;JGT\n\
+            ",
+            label = label
+        );
+
+        Ok(res)
+    }
 }
 
 impl Converter for HackConverter {
-    fn convert(self: &mut Self, command: Command) -> Result<String> {
+    fn convert(&mut self, command: Command) -> Result<String> {
         match command {
             Command::Push { segment, index } => self.convert_push(segment, index),
             Command::Pop { segment, index } => self.convert_pop(segment, index),
@@ -354,6 +383,8 @@ impl Converter for HackConverter {
             Command::And => self.convert_and(),
             Command::Or => self.convert_or(),
             Command::Not => self.convert_not(),
+            Command::Label { label } => self.convert_label(label),
+            Command::IfGoto { label } => self.convert_if_goto(label),
         }
     }
 }
