@@ -31,6 +31,7 @@ pub enum Command {
     Not,
     Label { label: String },
     IfGoto { label: String },
+    Goto { label: String },
 }
 
 impl Command {
@@ -89,6 +90,14 @@ impl Command {
                     .next()
                     .ok_or_else(|| anyhow::anyhow!("label name missing for directive `label`"))?;
                 Ok(Command::IfGoto {
+                    label: label.to_string(),
+                })
+            }
+            "goto" => {
+                let label = parts
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("label name missing for directive `label`"))?;
+                Ok(Command::Goto {
                     label: label.to_string(),
                 })
             }

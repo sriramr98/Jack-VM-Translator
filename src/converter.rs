@@ -343,15 +343,11 @@ impl HackConverter {
 
     fn convert_label(&mut self, label: String) -> Result<String> {
         self.labels.insert(label.clone());
-        let res = format!("@{label}", label = label);
+        let res = format!("({label})", label = label);
         Ok(res)
     }
 
-    fn convert_if_goto(&mut self, label: String) -> Result<String> {
-        if !self.labels.contains(&label) {
-            return Err(anyhow!("Label not created to JUMP"));
-        }
-
+    fn convert_if_goto(&self, label: String) -> Result<String> {
         let res = format!(
             "
                 // IF-GOTO {label}\n\
@@ -365,6 +361,18 @@ impl HackConverter {
             label = label
         );
 
+        Ok(res)
+    }
+
+    fn convert_goto(&self, label: String) -> Result<String> {
+        let res = format!(
+            "
+                // GOTO {label}\n\
+                @{label}\n\
+                0;JMP\n\
+            ",
+            label = label
+        );
         Ok(res)
     }
 }
@@ -385,6 +393,7 @@ impl Converter for HackConverter {
             Command::Not => self.convert_not(),
             Command::Label { label } => self.convert_label(label),
             Command::IfGoto { label } => self.convert_if_goto(label),
+            Command::Goto { label } => self.convert_goto(label),
         }
     }
 }
