@@ -18,14 +18,8 @@ pub enum Segment {
 
 #[derive(Debug, Display, PartialEq, Eq, Hash)]
 pub enum Command {
-    Push {
-        segment: Segment,
-        index: u16,
-    },
-    Pop {
-        segment: Segment,
-        index: u16,
-    },
+    Push { segment: Segment, index: u16 },
+    Pop { segment: Segment, index: u16 },
     Add,
     Sub,
     Neg,
@@ -35,20 +29,10 @@ pub enum Command {
     And,
     Or,
     Not,
-    Label {
-        label: String,
-    },
-    IfGoto {
-        label: String,
-    },
-    Goto {
-        label: String,
-    },
-    Function {
-        class: String,
-        name: String,
-        num_local_vars: u8,
-    },
+    Label { label: String },
+    IfGoto { label: String },
+    Goto { label: String },
+    Function { name: String, num_local_vars: u8 },
 }
 
 impl Command {
@@ -124,18 +108,6 @@ impl Command {
                     .next()
                     .ok_or_else(|| anyhow::anyhow!("Function name missing"))?;
 
-                let mut class_func_split = class_func_name.split(".");
-                let class_name = class_func_split.next().ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Class name missing. Expected function ClassName.functionName numArgs"
-                    )
-                })?;
-                let function_name = class_func_split.next().ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Function Name missing. Expected `function ClassName.FunctionName numArgs`"
-                    )
-                })?;
-
                 let num_local_vars: u8 = parts
                     .next()
                     .ok_or_else(|| {
@@ -145,11 +117,9 @@ impl Command {
                     })?
                     .parse()?;
                 let func = Command::Function {
-                    class: String::from(class_name),
-                    name: String::from(function_name),
+                    name: String::from(class_func_name),
                     num_local_vars,
                 };
-                dbg!(&func);
                 Ok(func)
             }
             _ => Err(anyhow::anyhow!("Unknown command: {}", command_str)),
