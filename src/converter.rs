@@ -376,8 +376,9 @@ impl HackConverter {
         Ok(res)
     }
 
-    fn convert_function(&self, class: String, func_name: String, num_args: u8) -> Result<String> {
-        Ok(String::new())
+    fn convert_function(&self, func_name: String, _num_args: u8) -> Result<String> {
+        //TODO:Might need to store the num_args in state to use during `call`
+        Ok(format!("({func_name})", func_name = func_name))
     }
 }
 
@@ -399,10 +400,9 @@ impl Converter for HackConverter {
             Command::IfGoto { label } => self.convert_if_goto(label),
             Command::Goto { label } => self.convert_goto(label),
             Command::Function {
-                class,
                 name,
                 num_local_vars,
-            } => self.convert_function(class, name, num_local_vars),
+            } => self.convert_function(name, num_local_vars),
         }
     }
 }
