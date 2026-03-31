@@ -33,6 +33,7 @@ pub enum Command {
     IfGoto { label: String },
     Goto { label: String },
     Function { name: String, num_local_vars: u8 },
+    Return,
 }
 
 impl Command {
@@ -122,6 +123,7 @@ impl Command {
                 };
                 Ok(func)
             }
+            "return" => Ok(Command::Return),
             _ => Err(anyhow::anyhow!("Unknown command: {}", command_str)),
         }
     }

@@ -392,6 +392,72 @@ impl HackConverter {
 
         Ok(res)
     }
+
+    fn convert_return(&self) -> Result<String> {
+        Ok("// return\n\
+            // FRAME = LCL (store in R13)\n\
+            @LCL\n\
+            D=M\n\
+            @R13\n\
+            M=D\n\
+            // RET = *(FRAME-5) (store return address in R14)\n\
+            @5\n\
+            A=D-A\n\
+            D=M\n\
+            @R14\n\
+            M=D\n\
+            // *ARG = pop() (reposition return value for caller)\n\
+            @SP\n\
+            M=M-1\n\
+            A=M\n\
+            D=M\n\
+            @ARG\n\
+            A=M\n\
+            M=D\n\
+            // SP = ARG+1 (restore caller's SP)\n\
+            @ARG\n\
+            D=M+1\n\
+            @SP\n\
+            M=D\n\
+            // THAT = *(FRAME-1)\n\
+            @R13\n\
+            D=M\n\
+            @1\n\
+            A=D-A\n\
+            D=M\n\
+            @THAT\n\
+            M=D\n\
+            // THIS = *(FRAME-2)\n\
+            @R13\n\
+            D=M\n\
+            @2\n\
+            A=D-A\n\
+            D=M\n\
+            @THIS\n\
+            M=D\n\
+            // ARG = *(FRAME-3)\n\
+            @R13\n\
+            D=M\n\
+            @3\n\
+            A=D-A\n\
+            D=M\n\
+            @ARG\n\
+            M=D\n\
+            // LCL = *(FRAME-4)\n\
+            @R13\n\
+            D=M\n\
+            @4\n\
+            A=D-A\n\
+            D=M\n\
+            @LCL\n\
+            M=D\n\
+            // goto RET\n\
+            @R14\n\
+            A=M\n\
+            0;JMP\n\
+            "
+        .to_string())
+    }
 }
 
 impl Converter for HackConverter {
@@ -415,6 +481,7 @@ impl Converter for HackConverter {
                 name,
                 num_local_vars,
             } => self.convert_function(name, num_local_vars),
+            Command::Return => self.convert_return(),
         }
     }
 }
