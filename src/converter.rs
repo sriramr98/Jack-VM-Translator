@@ -1,3 +1,4 @@
+use core::num;
 use std::collections::{HashMap, HashSet};
 
 use anyhow::{Ok, Result, anyhow};
@@ -376,11 +377,19 @@ impl HackConverter {
         Ok(res)
     }
 
-    fn convert_function(&self, func_name: String, num_args: u8) -> Result<String> {
+    fn convert_function(&self, func_name: String, num_local_vars: u8) -> Result<String> {
         let mut res = String::new();
-        res += format!("({func_name})", func_name = func_name).as_str();
+        res += format!(
+            "
+            // function {func_name} {num_local_vars}\n\
+            ({func_name})\n\
+        ",
+            func_name = func_name,
+            num_local_vars = num_local_vars
+        )
+        .as_str();
 
-        for _ in 0..num_args {
+        for _ in 0..num_local_vars {
             res += "
                 @SP\n\
                 A=M\n\
