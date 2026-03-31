@@ -376,9 +376,21 @@ impl HackConverter {
         Ok(res)
     }
 
-    fn convert_function(&self, func_name: String, _num_args: u8) -> Result<String> {
-        //TODO:Might need to store the num_args in state to use during `call`
-        Ok(format!("({func_name})", func_name = func_name))
+    fn convert_function(&self, func_name: String, num_args: u8) -> Result<String> {
+        let mut res = String::new();
+        res += format!("({func_name})", func_name = func_name).as_str();
+
+        for _ in 0..num_args {
+            res += "
+                @SP\n\
+                A=M\n\
+                M=0\n\
+                @SP\n\
+                M=M+1\n\
+            "
+        }
+
+        Ok(res)
     }
 }
 
