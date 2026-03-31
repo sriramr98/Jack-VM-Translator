@@ -1,4 +1,3 @@
-use core::num;
 use std::collections::{HashMap, HashSet};
 
 use anyhow::{Ok, Result, anyhow};
@@ -13,6 +12,7 @@ pub struct HackConverter {
     type_count: HashMap<Command, u64>,
     file_name: String,
     labels: HashSet<String>,
+    call_count: u64,
 }
 
 fn get_segment_label(segment: &Segment) -> String {
@@ -27,11 +27,16 @@ fn get_segment_label(segment: &Segment) -> String {
 }
 
 impl HackConverter {
+    pub fn set_file_name(&mut self, file_name: String) {
+        self.file_name = file_name;
+    }
+
     pub fn new(file_name: String) -> Self {
         Self {
             type_count: HashMap::new(),
             file_name,
             labels: HashSet::new(),
+            call_count: 0,
         }
     }
 
@@ -357,7 +362,7 @@ impl HackConverter {
                 A=M\n\
                 D=M\n\
                 @{label}\n\
-                D;JGT\n\
+                D;JNE\n\
             ",
             label = label
         );
@@ -400,6 +405,78 @@ impl HackConverter {
         }
 
         Ok(res)
+    }
+
+    fn convert_call(&mut self, name: String, num_args: u8) -> Result<String> {
+        let return_label = format!("{}$ret.{}", name, self.call_count);
+        self.call_count += 1;
+
+        Ok(format!(
+            "// call {name} {num_args}\n\
+            // push return address\n\
+            @{return_label}\n\
+            D=A\n\
+            @SP\n\
+            A=M\n\
+            M=D\n\
+            @SP\n\
+            M=M+1\n\
+            // push LCL\n\
+            @LCL\n\
+            D=M\n\
+            @SP\n\
+            A=M\n\
+            M=D\n\
+            @SP\n\
+            M=M+1\n\
+            // push ARG\n\
+            @ARG\n\
+            D=M\n\
+            @SP\n\
+            A=M\n\
+            M=D\n\
+            @SP\n\
+            M=M+1\n\
+            // push THIS\n\
+            @THIS\n\
+            D=M\n\
+            @SP\n\
+            A=M\n\
+            M=D\n\
+            @SP\n\
+            M=M+1\n\
+            // push THAT\n\
+            @THAT\n\
+            D=M\n\
+            @SP\n\
+            A=M\n\
+            M=D\n\
+            @SP\n\
+            M=M+1\n\
+            // ARG = SP - 5 - num_args\n\
+            @SP\n\
+            D=M\n\
+            @5\n\
+            D=D-A\n\
+            @{num_args}\n\
+            D=D-A\n\
+            @ARG\n\
+            M=D\n\
+            // LCL = SP\n\
+            @SP\n\
+            D=M\n\
+            @LCL\n\
+            M=D\n\
+            // goto function\n\
+            @{name}\n\
+            0;JMP\n\
+            // return address label\n\
+            ({return_label})\n\
+            ",
+            name = name,
+            num_args = num_args,
+            return_label = return_label,
+        ))
     }
 
     fn convert_return(&self) -> Result<String> {
@@ -490,6 +567,7 @@ impl Converter for HackConverter {
                 name,
                 num_local_vars,
             } => self.convert_function(name, num_local_vars),
+            Command::Call { name, num_args } => self.convert_call(name, num_args),
             Command::Return => self.convert_return(),
         }
     }

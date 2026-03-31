@@ -33,6 +33,7 @@ pub enum Command {
     IfGoto { label: String },
     Goto { label: String },
     Function { name: String, num_local_vars: u8 },
+    Call { name: String, num_args: u8 },
     Return,
 }
 
@@ -122,6 +123,19 @@ impl Command {
                     num_local_vars,
                 };
                 Ok(func)
+            }
+            "call" => {
+                let name = parts
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("Function name missing for `call`"))?;
+                let num_args: u8 = parts
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("Expected num args after function name for `call`"))?
+                    .parse()?;
+                Ok(Command::Call {
+                    name: name.to_string(),
+                    num_args,
+                })
             }
             "return" => Ok(Command::Return),
             _ => Err(anyhow::anyhow!("Unknown command: {}", command_str)),
